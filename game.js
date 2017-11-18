@@ -38,8 +38,39 @@ function keyboard(keyCode) {
     return key;
 }
 var canvas = document.getElementById('myCanvas');
+canvas.backgroundColor = 'white';
 var ctx = canvas.getContext('2d');
 ctx.font = '18px "xkcd"';
+
+canvas.addEventListener("mousemove", function (e) {
+            state.mouseevent('move', e)
+        }, false);
+canvas.addEventListener("mousedown", function (e) {
+            state.mouseevent('down', e)
+        }, false);
+canvas.addEventListener("mouseup", function (e) {
+            state.mouseevent('up', e)
+        }, false);
+canvas.addEventListener("mouseout", function (e) {
+            state.mouseevent('out', e)
+        }, false);
+
+var state = {};
+var wait_click = true;
+function do_nothing(a, b) {
+    if (a === 'down') {
+        wait_click = false;
+    }
+}
+function click_start(a, b) {
+    if (a === 'down') {
+        game_prop_dx = 164;
+        intro = false;
+        setStage();
+        state.mouseevent = do_nothing;
+    }
+}
+state.mouseevent = do_nothing;
 
 var left = keyboard(37),
     up = keyboard(38),
@@ -67,7 +98,18 @@ right.press = function() {
 right.release = function() {
     game_char_dx = 0;
 }
-
+var skip = 0;
+up.press = function() {
+    if(!triggerObjects()) {
+        skip = 1;
+    }
+}
+up.release = function() {
+    skip = 0;
+}
+abutton.press = function() {
+    say([["I've proven that I am",  "living in a simulation."], ["Now what?"]]);
+}
 var intro1 = new Image();
 intro1.src = 'intro1.png';
 var intro2 = new Image();
@@ -80,6 +122,9 @@ sprite.src = 'run.png';
 
 var sprite_stand = new Image();
 sprite_stand.src = 'stand0x.png';
+
+var spriteSkip = new Image();
+spriteSkip.src = 'anim1x.png';
 
 var ground = new Image();
 ground.src = 'ground0.png';
@@ -95,6 +140,15 @@ prop3.src = 'painting.png';
 
 var door1 = new Image();
 door1.src = 'door1.png';
+
+var z0 = new Image();
+z0.src = 'prop_sink.png';
+var z1 = new Image();
+z1.src = 'prop_phone0.png';
+var z2 = new Image();
+z2.src = 'prop_chair0.png';
+var z3 = new Image();
+z3.src = 'door_side.png';
 
 var intro = true;
 var intro_n = 0;
@@ -117,16 +171,22 @@ var frame = 0;
 var frameTick = 0;
 var interval = 1000.0 / 60.0;
 function loop() {
+
     now = timestamp();
     delta += Math.min(1000, (now - then));
     while(delta > interval) {
         delta -= interval;
         //state.update(interval / 1000);
         if ((++frameTick)%4 == 0) ++frame;
+
     }
+
     // Draw
     ctx.fillStyle = "white";
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (wait_click) { then = timestamp(); requestAnimationFrame(loop); return; }
+
     //state.draw();
     //var m = (frame%10);
     //var srcX = (m%9)*400,
@@ -134,6 +194,7 @@ function loop() {
     //var width = 360, height = 240;
     //var x = 0, y = 0;
     //ctx.drawImage(sprite, srcX, srcY, width, height, x, y, width, height);
+
 
     if (intro) {
 
@@ -182,14 +243,12 @@ function loop() {
             ctx.fillText(b[i], x0, 175 + (i - intro_speech_n * 3) * 20, w);
         }
 
-        if (frame == 4) {
-            frame = 0;
+        if (frame % 6 == 0) {
             if (intro_n == a.length) {
                 ++intro_speech_n;
                 if (intro_speech_n == 3) {
-                    game_prop_dx = 164;
-                    intro = false;
-                    setStage();
+                    state.mouseevent = click_start;
+                    intro_speech_n = 2;
                 }
             } else {
                 intro_n++;
@@ -213,6 +272,11 @@ function loop() {
             m = (frame%14);
             srcX = (m)*1300/14
         }
+        if (skip) {
+            drawSprite = spriteSkip;
+            m = (frame%12);
+            srcX = (m)*1300/14+22;
+        }
 
         var x0 = x - ground.width * 1.5 - game_char_x;// - (frameTick%40)/40 * ground.width;
         var y0 = y + sprite.height - 7;
@@ -222,6 +286,9 @@ function loop() {
         ctx.drawImage(ground, 0, 0, ground.width, ground.height, x0 + 3*ground.width, y0, ground.width, ground.height);
 
         drawStage();
+
+        updateSayer();
+        drawSayer();
 
         if (game_char_dx < 0) {
             left = true;
@@ -274,16 +341,54 @@ function setStage() {
 
     item = {};
     item.sprite = prop3;
-    item.x = 200;
+    item.x = 500;
     item.y = 90;
     item.z = 10;
+    item.trigger = function() { say([["It's a knock off reproduction", "of dogs playing Euchre"], ["There's another painting in the", "background of dogs playing Mao"]]) };
     stage_items.push(item);
 
     item = {};
     item.sprite = door1;
-    item.x = -200;
+    item.x = -280;
     item.y = 0;
     item.z = 10;
+    item.trigger = function() { goKitchen() };
+    stage_items.push(item);
+
+    //
+}
+
+function goKitchen() {
+    stage_items = [];
+
+    var item = {};
+    item.sprite = z0;
+    item.x = -100;
+    item.y = 0;
+    item.z = 3;
+    stage_items.push(item);
+
+    item = {};
+    item.sprite = z1;
+    item.x = 50;
+    item.y = 0;
+    item.z = 4;
+    item.trigger = function() { say([["The xkcd phone 5S.", "Heaps of storage space."], ["I'm glad they reduced", "the size of the bevel"]]) };
+    stage_items.push(item);
+
+    item = {};
+    item.sprite = z2;
+    item.x = 500;
+    item.y = 0;
+    item.z = 6;
+    stage_items.push(item);
+
+    item = {};
+    item.sprite = z3;
+    item.x = -330;
+    item.y = -5;
+    item.z = 0;
+    item.trigger = function() { set() };
     stage_items.push(item);
 }
 
@@ -303,5 +408,96 @@ function drawStage() {
             item.dx *= (1 - 0.08);
         }
     }
+}
 
+
+// Talking --------------------------------------------------------------
+var phrases = [];
+var currentPhrase = [[], []];
+var currentLine = 0;
+var currentChar = 0;
+var currentPause = 0;
+var currentPhraseSet = 0;
+function say(phrase) {
+    phrases.push(phrase);
+    //currentPhraseSet = 0;
+    currentPause = 0;
+    currentPhrase = phrases[0];
+    currentPhraseSet = 0;
+    currentLine = 0;
+    currentChar = 0;
+}
+
+function updateSayer() {
+
+    if (currentPause) {
+        currentPause--;
+        if (currentPause <= 0) {
+            currentPhrase = [[],[]];
+            currentPhraseSet = 0;
+            currentLine = 0;
+            currentChar = 0;
+        }
+    }
+
+    if (frameTick%2 == 1) {
+        ++currentChar;
+        if (currentPhrase[currentPhraseSet].length &&
+            currentChar === currentPhrase[currentPhraseSet][currentLine].length) {
+            if (currentLine < currentPhrase[currentPhraseSet].length-1) {
+                currentChar = 0;
+                ++currentLine;
+            } else if (currentPhraseSet == 0) {
+                ++currentPhraseSet;
+                currentLine = 0;
+                currentChar = 0;
+            } else if (currentPhraseSet == 1) {
+                currentPause = 100;
+            }
+        }
+    }
+}
+
+function drawSayer() {
+    if (currentPhrase[currentPhraseSet].length == 0) return;
+
+    for (var j = 0; j <= currentPhraseSet; ++j) {
+        for (var i = 0; i < currentPhrase[j].length; ++i) {
+            var text;
+            if (j == currentPhraseSet && i > currentLine) {
+                continue;
+            }
+            if (j == currentPhraseSet && i == currentLine) {
+                text = currentPhrase[j][i].substring(0, currentChar);
+            } else {
+                 text = currentPhrase[j][i];
+            }
+            ctx.fillStyle = 'black';
+            ctx.textAlign = 'center';
+            var x0 = 0.5 * canvas.width + 72;
+            var w = 250;
+            ctx.fillText(text, x0, 195 + (i+(j-currentPhraseSet)*3.5) * 20, w);
+        }
+    }
+
+    ctx.beginPath();
+    ctx.arc(370, 205, 95, 0.05*Math.PI, 0.25*Math.PI);
+    ctx.stroke();
+}
+
+
+function triggerObjects() {
+    for (var i = 0; i < stage_items.length; ++i) {
+        var item = stage_items[i];
+
+        var prop = item.sprite;
+
+        if (Math.abs(item.x - game_char_x) <= prop.width) {
+            if (item.trigger) {
+                item.trigger();
+                return true;
+            }
+        }
+    }
+    return false;
 }
